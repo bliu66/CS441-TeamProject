@@ -62,6 +62,8 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation("com.google.maps.android:maps-compose:4.3.3")
     implementation(libs.firebase.firestore.ktx)
+    implementation(libs.androidx.navigation.runtime.ktx)
+    implementation(libs.androidx.navigation.compose)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

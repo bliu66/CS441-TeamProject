@@ -18,6 +18,7 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.rememberCameraPositionState
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.renderscript.RenderScript
 import androidx.annotation.RequiresPermission
@@ -47,6 +48,10 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleObserver
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +59,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
 
 
 class MainActivity : ComponentActivity() {
@@ -103,7 +110,8 @@ class MainActivity : ComponentActivity() {
             }
 
             MyApplicationTheme {
-                CurrentLocationContent(usePreciseLocation = true)
+                GameApp()
+                //CurrentLocationContent(usePreciseLocation = true)
             }
         }
     }
@@ -120,9 +128,43 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@RequiresPermission(
-    anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION],
-)
+@Composable
+fun GameApp(
+    navController: NavHostController = rememberNavController()
+) {
+    NavHost(navController = navController, startDestination = GameScreen.Start.name, modifier = Modifier) {
+        composable(route = GameScreen.Start.name) {
+            WelcomeScreen(onNextButtonClicked = { navController.navigate(GameScreen.Map.name) })
+        }
+        composable(route = GameScreen.Map.name)
+        {
+            CurrentLocationContent(usePreciseLocation = true)
+        }
+    }
+}
+
+@Composable
+fun WelcomeScreen(
+    onNextButtonClicked: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .fillMaxSize()
+    ) {
+        Text(
+            text = "PlaceHolder",
+            textAlign = TextAlign.Center
+        )
+        Button(onClick = { onNextButtonClicked() }) {
+            Text(text = "Next")
+        }
+    }
+}
+
+@SuppressLint("MissingPermission")
 @Composable
 fun CurrentLocationContent(usePreciseLocation: Boolean) {
     val scope = rememberCoroutineScope()
@@ -136,7 +178,14 @@ fun CurrentLocationContent(usePreciseLocation: Boolean) {
 
     var latitude = 0.0
     var longitude = 0.0
+    val pOIList = ArrayList<LatLng>()
+    pOIList.add(LatLng(42.08841350996699, -75.9697032716066))
+    pOIList.add(LatLng(42.087083843469486, -75.96695668960858))
+    pOIList.add(LatLng(42.091614149826036, -75.96495039726581))
+    pOIList.add(LatLng(42.088731988838745, -75.96392042919864))
+    pOIList.add(LatLng(42.0875559, -75.9689347))
 
+    Greeting(latitude = 42.0893, longitude = -75.9699, pOIList)
     Column(
         Modifier
             .fillMaxWidth()
@@ -173,7 +222,7 @@ fun CurrentLocationContent(usePreciseLocation: Boolean) {
                     val priority = if (usePreciseLocation) {
                         100
                     } else {
-                        50
+                        104
                     }
                     val result = locationClient.getCurrentLocation(
                         priority,
@@ -182,9 +231,16 @@ fun CurrentLocationContent(usePreciseLocation: Boolean) {
                     result?.let { fetchedLocation ->
                         latitude = fetchedLocation.latitude
                         longitude = fetchedLocation.longitude
-                        locationInfo =
-                            "Current location is \n" + "lat : ${fetchedLocation.latitude}\n" +
-                                    "long : ${fetchedLocation.longitude}\n" + "fetched at ${System.currentTimeMillis()}"
+                        val overlapRes = OverlapCheck(LatLng(fetchedLocation.latitude, fetchedLocation.longitude), pOIList)
+                        if (overlapRes) {
+                            locationInfo =
+                                "IT WORKED"
+                        }
+                        else {
+                            locationInfo =
+                                "Current location is \n" + "lat : ${fetchedLocation.latitude}\n" +
+                                        "long : ${fetchedLocation.longitude}\n" + "fetched at ${System.currentTimeMillis()}"
+                        }
                     }
                 }
             },
@@ -195,18 +251,39 @@ fun CurrentLocationContent(usePreciseLocation: Boolean) {
             text = locationInfo,
         )
     }
-    Greeting(latitude = 42.0876609, longitude = -75.968446)
+}
+
+fun OverlapCheck(location: LatLng, pOIList: ArrayList<LatLng>): Boolean {
+    for (element in pOIList)
+    {
+        if (element.latitude + 0.0002 > location.latitude && location.latitude > element.latitude - 0.0002 && element.longitude + 0.0002 > location.longitude && location.longitude > element.longitude - 0.0002)
+        {
+            return true
+        }
+    }
+    return false
 }
 
 @Composable
-fun Greeting(latitude: Double, longitude: Double, modifier: Modifier = Modifier) {
+fun Greeting(latitude: Double, longitude: Double, pOIList: ArrayList<LatLng>, modifier: Modifier = Modifier) {
     val example = LatLng(latitude, longitude)
     val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(example, 20f)
+        position = CameraPosition.fromLatLngZoom(example, 15f)
     }
     GoogleMap(
         modifier = Modifier.fillMaxSize(),
         cameraPositionState = cameraPositionState,
         properties = MapProperties(isMyLocationEnabled = true)
-    )
+    ) {
+        for (LatLng in pOIList)
+        {
+            Marker(state = MarkerState(LatLng))
+        }
+    }
+}
+
+enum class GameScreen
+{
+    Start,
+    Map,
 }
