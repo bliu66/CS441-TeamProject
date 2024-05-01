@@ -19,6 +19,9 @@ import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.rememberCameraPositionState
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Application
+import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.renderscript.RenderScript
 import androidx.annotation.RequiresPermission
@@ -45,6 +48,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleObserver
@@ -62,8 +66,20 @@ import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 
-
 class MainActivity : ComponentActivity() {
+    private lateinit var sharedPreferences: SharedPreferences
+    private lateinit var viewModel: MyViewModel
+    class MyViewModel(application: Application, private val sharedPreferences: SharedPreferences) : AndroidViewModel(application) {
+        fun updatePoints(newValue: Int) {
+            val editor = sharedPreferences.edit()
+            editor.putInt("Points", newValue)
+            editor.apply()
+        }
+
+        fun getPoints(): Int {
+            return sharedPreferences.getInt("Points",0)
+        }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -109,9 +125,23 @@ class MainActivity : ComponentActivity() {
                 SnackbarHostState()
             }
 
-            MyApplicationTheme {
-                GameApp()
-                //CurrentLocationContent(usePreciseLocation = true)
+            val sharedPreferences = getPreferences(Context.MODE_PRIVATE)
+            viewModel = MyViewModel(application, sharedPreferences)
+            val containsDate = sharedPreferences.contains("Date")
+            val containsPoints = sharedPreferences.contains("Points")
+            if (containsDate && containsPoints) {
+                MyApplicationTheme {
+                    GameApp(viewModel)
+                }
+            }
+            else {
+                val editor = sharedPreferences.edit()
+                editor.putInt("Date", 5)
+                editor.putInt("Points", 0)
+                editor.apply()
+                MyApplicationTheme {
+                    TestScreen()
+                }
             }
         }
     }
@@ -130,7 +160,8 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun GameApp(
-    navController: NavHostController = rememberNavController()
+    viewModel: MainActivity.MyViewModel,
+    navController: NavHostController = rememberNavController(),
 ) {
     NavHost(navController = navController, startDestination = GameScreen.Start.name, modifier = Modifier) {
         composable(route = GameScreen.Start.name) {
@@ -138,7 +169,7 @@ fun GameApp(
         }
         composable(route = GameScreen.Map.name)
         {
-            CurrentLocationContent(usePreciseLocation = true)
+            CurrentLocationContent(usePreciseLocation = true, viewModel)
         }
     }
 }
@@ -166,7 +197,7 @@ fun WelcomeScreen(
 
 @SuppressLint("MissingPermission")
 @Composable
-fun CurrentLocationContent(usePreciseLocation: Boolean) {
+fun CurrentLocationContent(usePreciseLocation: Boolean, viewModel: MainActivity.MyViewModel) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val locationClient = remember {
@@ -217,6 +248,7 @@ fun CurrentLocationContent(usePreciseLocation: Boolean) {
 
         Button(
             onClick = {
+                viewModel.updatePoints(10)
                 //To get more accurate or fresher device location use this method
                 scope.launch(Dispatchers.IO) {
                     val priority = if (usePreciseLocation) {
@@ -234,7 +266,7 @@ fun CurrentLocationContent(usePreciseLocation: Boolean) {
                         val overlapRes = OverlapCheck(LatLng(fetchedLocation.latitude, fetchedLocation.longitude), pOIList)
                         if (overlapRes) {
                             locationInfo =
-                                "IT WORKED"
+                                "${viewModel.getPoints()}"
                         }
                         else {
                             locationInfo =
@@ -256,7 +288,7 @@ fun CurrentLocationContent(usePreciseLocation: Boolean) {
 fun OverlapCheck(location: LatLng, pOIList: ArrayList<LatLng>): Boolean {
     for (element in pOIList)
     {
-        if (element.latitude + 0.0002 > location.latitude && location.latitude > element.latitude - 0.0002 && element.longitude + 0.0002 > location.longitude && location.longitude > element.longitude - 0.0002)
+        if (element.latitude + 0.00025 > location.latitude && location.latitude > element.latitude - 0.00025 && element.longitude + 0.00025 > location.longitude && location.longitude > element.longitude - 0.00025)
         {
             return true
         }
@@ -280,6 +312,12 @@ fun Greeting(latitude: Double, longitude: Double, pOIList: ArrayList<LatLng>, mo
             Marker(state = MarkerState(LatLng))
         }
     }
+}
+
+@Composable
+fun TestScreen()
+{
+    Text(text = "Hello World")
 }
 
 enum class GameScreen
