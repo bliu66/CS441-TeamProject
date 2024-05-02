@@ -39,6 +39,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -155,9 +156,11 @@ class MainActivity : ComponentActivity() {
             val calendar = Calendar.getInstance()
             val day = calendar.get(Calendar.DATE)
             if (containsDate && containsPoints) {
-                if(sharedPreferences.getInt("Day", 0) != day) {
+                if(sharedPreferences.getInt("Date", 0) != day) {
+                    val currPoints = sharedPreferences.getInt("Points", 0)
                     val editor = sharedPreferences.edit()
-                    editor.putInt("Day", day)
+                    editor.putInt("Points", currPoints - 5)
+                    editor.putInt("Date", day)
                     editor.putBoolean("0", true)
                     editor.putBoolean("1", true)
                     editor.putBoolean("2", true)
@@ -172,7 +175,7 @@ class MainActivity : ComponentActivity() {
             else {
                 val editor = sharedPreferences.edit()
                 editor.putInt("Date", day)
-                editor.putInt("Points", 0)
+                editor.putInt("Points", 10)
                 editor.putBoolean("0", true)
                 editor.putBoolean("1", true)
                 editor.putBoolean("2", true)
@@ -250,6 +253,9 @@ fun CurrentLocationContent(usePreciseLocation: Boolean, viewModel: MainActivity.
 
     var latitude = 0.0
     var longitude = 0.0
+    var currPoints by remember {
+        mutableIntStateOf(viewModel.getPoints())
+    }
 
     Greeting(latitude = 42.0893, longitude = -75.9699, pOIList, viewModel)
     Column(
@@ -260,6 +266,7 @@ fun CurrentLocationContent(usePreciseLocation: Boolean, viewModel: MainActivity.
         verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        Text(text = "${viewModel.getPoints()}")
         Button(
             onClick = {
                 // getting last known location is faster and minimizes battery usage
@@ -283,7 +290,6 @@ fun CurrentLocationContent(usePreciseLocation: Boolean, viewModel: MainActivity.
 
         Button(
             onClick = {
-                viewModel.updatePoints(10)
                 //To get more accurate or fresher device location use this method
                 scope.launch(Dispatchers.IO) {
                     val priority = if (usePreciseLocation) {
@@ -323,8 +329,11 @@ fun CurrentLocationContent(usePreciseLocation: Boolean, viewModel: MainActivity.
 fun OverlapCheck(location: LatLng, pOIList: ArrayList<LatLng>, viewModel: MainActivity.MyViewModel): Boolean {
     for (index in pOIList.indices)
     {
-        if (pOIList[index].latitude + 0.00025 > location.latitude && location.latitude > pOIList[index].latitude - 0.00025 && pOIList[index].longitude + 0.00025 > location.longitude && location.longitude > pOIList[index].longitude - 0.00025)
+        if (pOIList[index].latitude + 0.00025 > location.latitude && location.latitude > pOIList[index].latitude - 0.00025 && pOIList[index].longitude + 0.00025 > location.longitude && location.longitude > pOIList[index].longitude - 0.00025 && viewModel.getPOIStatus(index))
         {
+            var currPoints = viewModel.getPoints()
+            currPoints += 5
+            viewModel.updatePoints(currPoints)
             viewModel.updatePOIStatus(index, newValue = false)
             return true
         }
