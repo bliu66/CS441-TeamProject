@@ -23,6 +23,7 @@ import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.icu.util.Calendar
 import android.renderscript.RenderScript
 import androidx.annotation.RequiresPermission
 import androidx.compose.animation.animateContentSize
@@ -66,10 +67,18 @@ import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 
+val pOIList = arrayListOf<LatLng>(
+    LatLng(42.08841350996699, -75.9697032716066), //bartle
+    LatLng(42.087083843469486, -75.96695668960858), //union
+    LatLng(42.091614149826036, -75.96495039726581), //east gym
+    LatLng(42.088731988838745, -75.96392042919864), //whitney
+    LatLng(42.0876609, -75.9684465) //Watson Commons (Engineering Building)
+)
+
 class MainActivity : ComponentActivity() {
     private lateinit var sharedPreferences: SharedPreferences
     private lateinit var viewModel: MyViewModel
-    class MyViewModel(application: Application, private val sharedPreferences: SharedPreferences) : AndroidViewModel(application) {
+    class MyViewModel(application: Application, private val sharedPreferences: SharedPreferences) : AndroidViewModel(application) { //used to interact with shared preferences --> it is not supposed to be directly referenced from inside a composable function
         fun updatePoints(newValue: Int) {
             val editor = sharedPreferences.edit()
             editor.putInt("Points", newValue)
@@ -79,10 +88,21 @@ class MainActivity : ComponentActivity() {
         fun getPoints(): Int {
             return sharedPreferences.getInt("Points",0)
         }
+
+        fun updatePOIStatus(index: Int, newValue: Boolean) {
+            val editor = sharedPreferences.edit()
+            editor.putBoolean("$index", newValue)
+            editor.apply()
+        }
+
+        fun getPOIStatus(index: Int): Boolean {
+            return sharedPreferences.getBoolean("$index", false)
+        }
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
+            //the permissions that will necessary for the program to run
             var locationPermissionGranted by remember {mutableStateOf(checkPermission())}
             val requestedPermissions = arrayOf(
                 Manifest.permission.ACCESS_COARSE_LOCATION,
@@ -102,6 +122,7 @@ class MainActivity : ComponentActivity() {
                 }
             )
 
+            //checks if the location permissions have already been granted
             val lifecycleOwner = LocalLifecycleOwner.current
             DisposableEffect(key1 = lifecycleOwner, effect = {
                 val observer = LifecycleEventObserver { _, event ->
@@ -116,6 +137,7 @@ class MainActivity : ComponentActivity() {
                 }
             })
 
+            //probably unnecessary, just keeping them for now
             var currentPermissionStatus by remember {
                 mutableStateOf(decideCurrentPermissionStatus(locationPermissionGranted))
             }
@@ -125,19 +147,37 @@ class MainActivity : ComponentActivity() {
                 SnackbarHostState()
             }
 
+            //implementation of persistent storage using sharedpreferences api
             val sharedPreferences = getPreferences(Context.MODE_PRIVATE)
             viewModel = MyViewModel(application, sharedPreferences)
             val containsDate = sharedPreferences.contains("Date")
             val containsPoints = sharedPreferences.contains("Points")
+            val calendar = Calendar.getInstance()
+            val day = calendar.get(Calendar.DATE)
             if (containsDate && containsPoints) {
+                if(sharedPreferences.getInt("Day", 0) != day) {
+                    val editor = sharedPreferences.edit()
+                    editor.putInt("Day", day)
+                    editor.putBoolean("0", true)
+                    editor.putBoolean("1", true)
+                    editor.putBoolean("2", true)
+                    editor.putBoolean("3", true)
+                    editor.putBoolean("4", true)
+                    editor.apply()
+                }
                 MyApplicationTheme {
                     GameApp(viewModel)
                 }
             }
             else {
                 val editor = sharedPreferences.edit()
-                editor.putInt("Date", 5)
+                editor.putInt("Date", day)
                 editor.putInt("Points", 0)
+                editor.putBoolean("0", true)
+                editor.putBoolean("1", true)
+                editor.putBoolean("2", true)
+                editor.putBoolean("3", true)
+                editor.putBoolean("4", true)
                 editor.apply()
                 MyApplicationTheme {
                     TestScreen()
@@ -163,6 +203,7 @@ fun GameApp(
     viewModel: MainActivity.MyViewModel,
     navController: NavHostController = rememberNavController(),
 ) {
+    //used to navigate between different screens
     NavHost(navController = navController, startDestination = GameScreen.Start.name, modifier = Modifier) {
         composable(route = GameScreen.Start.name) {
             WelcomeScreen(onNextButtonClicked = { navController.navigate(GameScreen.Map.name) })
@@ -209,14 +250,8 @@ fun CurrentLocationContent(usePreciseLocation: Boolean, viewModel: MainActivity.
 
     var latitude = 0.0
     var longitude = 0.0
-    val pOIList = ArrayList<LatLng>()
-    pOIList.add(LatLng(42.08841350996699, -75.9697032716066))
-    pOIList.add(LatLng(42.087083843469486, -75.96695668960858))
-    pOIList.add(LatLng(42.091614149826036, -75.96495039726581))
-    pOIList.add(LatLng(42.088731988838745, -75.96392042919864))
-    pOIList.add(LatLng(42.0875559, -75.9689347))
 
-    Greeting(latitude = 42.0893, longitude = -75.9699, pOIList)
+    Greeting(latitude = 42.0893, longitude = -75.9699, pOIList, viewModel)
     Column(
         Modifier
             .fillMaxWidth()
@@ -263,7 +298,7 @@ fun CurrentLocationContent(usePreciseLocation: Boolean, viewModel: MainActivity.
                     result?.let { fetchedLocation ->
                         latitude = fetchedLocation.latitude
                         longitude = fetchedLocation.longitude
-                        val overlapRes = OverlapCheck(LatLng(fetchedLocation.latitude, fetchedLocation.longitude), pOIList)
+                        val overlapRes = OverlapCheck(LatLng(fetchedLocation.latitude, fetchedLocation.longitude), pOIList, viewModel)
                         if (overlapRes) {
                             locationInfo =
                                 "${viewModel.getPoints()}"
@@ -285,11 +320,12 @@ fun CurrentLocationContent(usePreciseLocation: Boolean, viewModel: MainActivity.
     }
 }
 
-fun OverlapCheck(location: LatLng, pOIList: ArrayList<LatLng>): Boolean {
-    for (element in pOIList)
+fun OverlapCheck(location: LatLng, pOIList: ArrayList<LatLng>, viewModel: MainActivity.MyViewModel): Boolean {
+    for (index in pOIList.indices)
     {
-        if (element.latitude + 0.00025 > location.latitude && location.latitude > element.latitude - 0.00025 && element.longitude + 0.00025 > location.longitude && location.longitude > element.longitude - 0.00025)
+        if (pOIList[index].latitude + 0.00025 > location.latitude && location.latitude > pOIList[index].latitude - 0.00025 && pOIList[index].longitude + 0.00025 > location.longitude && location.longitude > pOIList[index].longitude - 0.00025)
         {
+            viewModel.updatePOIStatus(index, newValue = false)
             return true
         }
     }
@@ -297,7 +333,7 @@ fun OverlapCheck(location: LatLng, pOIList: ArrayList<LatLng>): Boolean {
 }
 
 @Composable
-fun Greeting(latitude: Double, longitude: Double, pOIList: ArrayList<LatLng>, modifier: Modifier = Modifier) {
+fun Greeting(latitude: Double, longitude: Double, pOIList: ArrayList<LatLng>, viewModel: MainActivity.MyViewModel, modifier: Modifier = Modifier) {
     val example = LatLng(latitude, longitude)
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(example, 15f)
@@ -307,9 +343,12 @@ fun Greeting(latitude: Double, longitude: Double, pOIList: ArrayList<LatLng>, mo
         cameraPositionState = cameraPositionState,
         properties = MapProperties(isMyLocationEnabled = true)
     ) {
-        for (LatLng in pOIList)
+        for (index in pOIList.indices)
         {
-            Marker(state = MarkerState(LatLng))
+            if (viewModel.getPOIStatus(index))
+            {
+                Marker(state = MarkerState(pOIList[index]))
+            }
         }
     }
 }
