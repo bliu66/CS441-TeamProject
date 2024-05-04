@@ -23,17 +23,30 @@ import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.graphics.drawable.shapes.Shape
 import android.icu.util.Calendar
 import android.renderscript.RenderScript
 import androidx.annotation.RequiresPermission
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -45,10 +58,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.Lifecycle
@@ -219,29 +239,76 @@ fun GameApp(
 }
 
 @Composable
+fun ClickableImageButton(
+    painter: Painter,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    contentDescription: String? = null
+) {
+    Box(
+        modifier = modifier
+            .clickable(onClick = onClick)
+            .width(250.dp)
+            .height(100.dp)
+            .offset(y=16.dp)
+    ) {
+        Image(
+            painter = painter,
+            contentDescription = contentDescription,
+            modifier = Modifier
+                .size(500.dp)
+                .align(Alignment.Center),
+        )
+    }
+}
+
+@Composable
 fun WelcomeScreen(
     onNextButtonClicked: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .fillMaxSize()
+    val backgroundImage = painterResource(R.drawable.title_screen)
+    val playButtonImage = painterResource(R.drawable.play_button)
+    Box(
+        modifier = Modifier.fillMaxSize()
     ) {
-        Text(
-            text = "PlaceHolder",
-            textAlign = TextAlign.Center
+        Image(
+            painter = backgroundImage,
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize()
         )
-        Button(onClick = { onNextButtonClicked() }) {
-            Text(text = "Next")
-        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Press Play to Conquer the Campus!",
+                textAlign = TextAlign.Center,
+                color = Color.White,
+                // fontSize = 20.dp,
+
+                )
+            Spacer(modifier = Modifier.height(16.dp))
+            ClickableImageButton(
+                painter = playButtonImage,
+                onClick = onNextButtonClicked,
+                )
+          }
     }
 }
 
 @SuppressLint("MissingPermission")
 @Composable
 fun CurrentLocationContent(usePreciseLocation: Boolean, viewModel: MainActivity.MyViewModel) {
+    val mapScreenStyle = TextStyle(
+        color = Color.White,
+        fontSize = 24.sp,
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center,
+    )
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val locationClient = remember {
@@ -260,69 +327,83 @@ fun CurrentLocationContent(usePreciseLocation: Boolean, viewModel: MainActivity.
     Greeting(latitude = 42.0893, longitude = -75.9699, pOIList, viewModel)
     Column(
         Modifier
-            .fillMaxWidth()
             .animateContentSize()
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Top,
+            horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(text = "${viewModel.getPoints()}")
-        Button(
-            onClick = {
-                // getting last known location is faster and minimizes battery usage
-                // This information may be out of date.
-                // Location may be null as previously no client has access location
-                // or location turned of in device setting.
-                // Please handle for null case as well as additional check can be added before using the method
-                scope.launch(Dispatchers.IO) {
-                    val result = locationClient.lastLocation.await()
-                    locationInfo = if (result == null) {
-                        "No last known location. Try fetching the current location first"
-                    } else {
-                        "Current location is \n" + "lat : ${result.latitude}\n" +
-                                "long : ${result.longitude}\n" + "fetched at ${System.currentTimeMillis()}"
-                    }
-                }
-            },
+        Box(    // points display
+            modifier = Modifier
+                .padding(16.dp)
+                .width(150.dp)
         ) {
-            Text("Get last known location")
+            Text(
+                text = "Points: ${viewModel.getPoints()}",
+                style = mapScreenStyle,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(23, 157, 122))
+                    .padding(8.dp)
+            )
         }
 
-        Button(
-            onClick = {
-                //To get more accurate or fresher device location use this method
-                scope.launch(Dispatchers.IO) {
-                    val priority = if (usePreciseLocation) {
-                        100
-                    } else {
-                        104
-                    }
-                    val result = locationClient.getCurrentLocation(
-                        priority,
-                        CancellationTokenSource().token,
-                    ).await()
-                    result?.let { fetchedLocation ->
-                        latitude = fetchedLocation.latitude
-                        longitude = fetchedLocation.longitude
-                        val overlapRes = OverlapCheck(LatLng(fetchedLocation.latitude, fetchedLocation.longitude), pOIList, viewModel)
-                        if (overlapRes) {
-                            locationInfo =
-                                "${viewModel.getPoints()}"
-                        }
-                        else {
-                            locationInfo =
-                                "Current location is \n" + "lat : ${fetchedLocation.latitude}\n" +
-                                        "long : ${fetchedLocation.longitude}\n" + "fetched at ${System.currentTimeMillis()}"
-                        }
-                    }
-                }
-            },
+        Spacer(modifier = Modifier.height(450.dp))
+
+        Box(    // get current location button
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth()
         ) {
-            Text(text = "Get current location")
+            Button(
+                onClick = {
+                    //To get more accurate or fresher device location use this method
+                    scope.launch(Dispatchers.IO) {
+                        val priority = if (usePreciseLocation) {
+                            100
+                        } else {
+                            104
+                        }
+                        val result = locationClient.getCurrentLocation(
+                            priority,
+                            CancellationTokenSource().token,
+                        ).await()
+                        result?.let { fetchedLocation ->
+                            latitude = fetchedLocation.latitude
+                            longitude = fetchedLocation.longitude
+                            val overlapRes = OverlapCheck(
+                                LatLng(
+                                    fetchedLocation.latitude,
+                                    fetchedLocation.longitude
+                                ), pOIList, viewModel
+                            )
+                            if (overlapRes) {
+                                locationInfo =
+                                    "${viewModel.getPoints()}"
+                            } else {
+                                locationInfo =
+                                    "Current location is \n" + "lat : ${fetchedLocation.latitude}\n" +
+                                            "long : ${fetchedLocation.longitude}\n" + "fetched at ${System.currentTimeMillis()}"
+                            }
+                        }
+                    }
+                },
+                colors = ButtonDefaults.buttonColors (
+                    containerColor = Color(23, 157, 122), // Set background color to match the text box
+                    contentColor = Color.White
+                    ),
+            ) {
+                Text(text = "Get current location",
+                    style = mapScreenStyle,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(23, 157, 122))
+                        .padding(8.dp)
+                )
+            }
+            Text(
+                text = locationInfo,
+            )
         }
-        Text(
-            text = locationInfo,
-        )
     }
 }
 
