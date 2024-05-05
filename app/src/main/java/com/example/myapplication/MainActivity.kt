@@ -87,6 +87,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
+import java.text.SimpleDateFormat
+import java.util.Date
 
 val pOIList = arrayListOf<LatLng>(
     LatLng(42.08841350996699, -75.9697032716066), //bartle
@@ -250,7 +252,7 @@ fun ClickableImageButton(
             .clickable(onClick = onClick)
             .width(250.dp)
             .height(100.dp)
-            .offset(y=16.dp)
+            .offset(y = 16.dp)
     ) {
         Image(
             painter = painter,
@@ -317,7 +319,7 @@ fun CurrentLocationContent(usePreciseLocation: Boolean, viewModel: MainActivity.
     var locationInfo by remember {
         mutableStateOf("")
     }
-
+    var gotLocationInfo = false
     var latitude = 0.0
     var longitude = 0.0
     var currPoints by remember {
@@ -347,7 +349,18 @@ fun CurrentLocationContent(usePreciseLocation: Boolean, viewModel: MainActivity.
             )
         }
 
-        Spacer(modifier = Modifier.height(450.dp))
+        Spacer(modifier = Modifier.height(385.dp))
+
+        Text(   // last known location text
+            text = locationInfo,
+            style = mapScreenStyle,
+            fontSize = 20.sp,
+            textAlign = TextAlign.Left,
+            modifier = Modifier
+                .padding(8.dp)
+                .background(Color(23, 157, 122, 95)),
+
+        )
 
         Box(    // get current location button
             modifier = Modifier
@@ -377,12 +390,21 @@ fun CurrentLocationContent(usePreciseLocation: Boolean, viewModel: MainActivity.
                                 ), pOIList, viewModel
                             )
                             if (overlapRes) {
-                                locationInfo =
                                     "${viewModel.getPoints()}"
                             } else {
+                                gotLocationInfo = true
+                                val formattedLatitude = "%.3f".format(fetchedLocation.latitude)
+                                val formattedLongitude = "%.3f".format(fetchedLocation.longitude)
+
+                                val currentTimeMillis = System.currentTimeMillis()
+                                val dateTimeFormat = SimpleDateFormat("MM/dd HH:mm")
+                                val formattedTime = dateTimeFormat.format(Date(currentTimeMillis))
+
                                 locationInfo =
-                                    "Current location is \n" + "lat : ${fetchedLocation.latitude}\n" +
-                                            "long : ${fetchedLocation.longitude}\n" + "fetched at ${System.currentTimeMillis()}"
+                                    "Last known location: \n" +
+                                    "Lat : $formattedLatitude\n" +
+                                    "Long : $formattedLongitude\n" +
+                                    "Synced at $formattedTime"
                             }
                         }
                     }
@@ -392,17 +414,16 @@ fun CurrentLocationContent(usePreciseLocation: Boolean, viewModel: MainActivity.
                     contentColor = Color.White
                     ),
             ) {
-                Text(text = "Get current location",
+                Text(
+                    text = "Sync your location\uD83D\uDCCD",
+                    fontSize = 22.sp,
                     style = mapScreenStyle,
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color(23, 157, 122))
-                        .padding(8.dp)
+                        .padding(4.dp)
                 )
             }
-            Text(
-                text = locationInfo,
-            )
         }
     }
 }
