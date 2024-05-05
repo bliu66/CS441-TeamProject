@@ -25,7 +25,9 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.drawable.shapes.Shape
 import android.icu.util.Calendar
+import android.media.MediaPlayer
 import android.renderscript.RenderScript
+import android.widget.Toast
 import androidx.annotation.RequiresPermission
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
@@ -387,7 +389,8 @@ fun CurrentLocationContent(usePreciseLocation: Boolean, viewModel: MainActivity.
                                 LatLng(
                                     fetchedLocation.latitude,
                                     fetchedLocation.longitude
-                                ), pOIList, viewModel
+                                ),
+                                pOIList, viewModel, context
                             )
                             if (overlapRes) {
                                     "${viewModel.getPoints()}"
@@ -428,7 +431,14 @@ fun CurrentLocationContent(usePreciseLocation: Boolean, viewModel: MainActivity.
     }
 }
 
-fun OverlapCheck(location: LatLng, pOIList: ArrayList<LatLng>, viewModel: MainActivity.MyViewModel): Boolean {
+fun pointsAwarded(context: Context) {
+    Toast.makeText(context, "\uD83C \uDFC6 Your campus has been successfully defended!", Toast.LENGTH_SHORT).show()
+
+    val mediaPlayer = MediaPlayer.create(context, R.raw.chime)
+    mediaPlayer.start()
+}
+
+fun OverlapCheck(location: LatLng, pOIList: ArrayList<LatLng>, viewModel: MainActivity.MyViewModel, context: Context): Boolean {
     for (index in pOIList.indices)
     {
         if (pOIList[index].latitude + 0.00025 > location.latitude && location.latitude > pOIList[index].latitude - 0.00025 && pOIList[index].longitude + 0.00025 > location.longitude && location.longitude > pOIList[index].longitude - 0.00025 && viewModel.getPOIStatus(index))
@@ -437,6 +447,9 @@ fun OverlapCheck(location: LatLng, pOIList: ArrayList<LatLng>, viewModel: MainAc
             currPoints += 5
             viewModel.updatePoints(currPoints)
             viewModel.updatePOIStatus(index, newValue = false)
+
+            pointsAwarded(context)
+
             return true
         }
     }
